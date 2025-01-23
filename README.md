@@ -4,6 +4,13 @@ preprocess and segment 384-well plates of 4-channel imaged iNeurons
 notes coming soon...
 
 
+--> preprocess.py - need path to raw image files, plate number, and a treatments file with 2 columns 'guide' & 'well'
+
+    *note well needs to be 3 characters (e.g. M05)
+
+    example call:
+    python preprocess.py /mnt/IXM/1014E/20241217-sp3-neuron-cpscreen-P1/2024-12-17/633/TimePoint_1/ treatments.txt 1
+
 
 
 

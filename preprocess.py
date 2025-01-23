@@ -16,29 +16,37 @@ import cv2
 import skimage.io as io
 import skimage
 
+import pyclesperanto_prototype as cle
+
 import sys
 import time
+os.environ["CUDA_VISIBLE_DEVICES"] = str(sys.argv[3])
 
-t0 = time.time()
+time0 = time.time()
 
 treatments = pandas.read_csv(sys.argv[2], sep='\t')
 w = {'tubulin': 0, 'mito': 1, 'lysosome': 2, 'dapi': 3, 'brightfield': 4}
 
 path = sys.argv[1]
 p = str(sys.argv[3])
-'''
-# if os.path.isdir('raw_imgs'):
-    # os.system('mkdir raw_imgs/plate' + p)
-    # os.system('mkdir imgs_corrected/plate' + p)
-os.system('mkdir raw_imgs')
-os.system('mkdir raw_imgs/plate' + p)
-os.system('mkdir imgs_corrected')
-os.system('mkdir imgs_corrected/plate' + p)
-os.system('mkdir processed')
-os.system('mkdir processed/plate' + p)
-os.system('mkdir processed/plate' + p + '/images')
-os.system('mkdir rescaled_imgs')
-os.system('mkdir rescaled_imgs/plate' + p)
+
+if os.path.isdir('raw_imgs'):
+    os.system('mkdir raw_imgs/plate' + p)
+    os.system('mkdir imgs_corrected/plate' + p)
+    os.system('mkdir processed/plate' + p)
+    os.system('mkdir processed/plate' + p + '/images')
+    os.system('mkdir rescaled_imgs/plate' + p)
+else:
+    os.system('mkdir raw_imgs')
+    os.system('mkdir raw_imgs/plate' + p)
+    os.system('mkdir imgs_corrected')
+    os.system('mkdir imgs_corrected/plate' + p)
+    os.system('mkdir processed')
+    os.system('mkdir processed/plate' + p)
+    os.system('mkdir processed/plate' + p + '/images')
+    os.system('mkdir rescaled_imgs')
+    os.system('mkdir rescaled_imgs/plate' + p)
+
 for g in treatments.guide.unique():
     os.system('mkdir processed/plate' + p + '/images/' + g)
 
@@ -48,15 +56,15 @@ print('# images: ' + str(len(raw_imgs)))
 for f in raw_imgs:
     name = f.split('/')[-1]
     # os.system('ln -s ' + f + ' raw_imgs/')
-    # os.system('cp ' + f + ' raw_imgs/' + name)
+    os.system('cp ' + f + ' raw_imgs/plate' + p + '/' + name)
     tmp = plt.imread(f)
-    io.imsave('raw_imgs/plate' + p + '/' + name, tmp)
+    # io.imsave('raw_imgs/plate' + p + '/' + name, tmp)
 
 
 # remove bad images:
 import qc
 qc
-'''
+
 
 tubu = [plt.imread(x) for x in sorted(glob.glob('raw_imgs/plate' + p + '/*.tif')) if '_w1' in x]
 tubu_labels = [x.split('/')[-1] for x in sorted(glob.glob('raw_imgs/plate' + p + '/*.tif')) if '_w1' in x]
@@ -87,13 +95,14 @@ mito = numpy.array(mito)
 lyso = numpy.array(lyso)
 dapi = numpy.array(dapi)
 
+
 def correct(channel, names):
     basic = BaSiC(get_darkfield=True, smoothness_flatfield=1)
     basic.fit(channel)
     images_transformed = basic.transform(channel)
     return(images_transformed, basic)
 
-tub_corrected, b = correct(tubu, tubu_labels)
+tub_flatfield, b = correct(tubu, tubu_labels)
 # plot the fit results:
 fig, axes = plt.subplots(1, 3, figsize=(9, 3))
 im = axes[0].imshow(b.flatfield)
@@ -108,7 +117,7 @@ axes[2].set_ylabel("Baseline")
 fig.tight_layout()
 fig.savefig('tubulin_flatfield_p' + p + '.png')
 
-mit_corrected, m = correct(mito, mito_labels)
+mit_flatfield, m = correct(mito, mito_labels)
 # plot the fit results:
 fig, axes = plt.subplots(1, 3, figsize=(9, 3))
 im = axes[0].imshow(m.flatfield)
@@ -123,7 +132,7 @@ axes[2].set_ylabel("Baseline")
 fig.tight_layout()
 fig.savefig('mito_flatfield_p' + p + '.png')
 
-lys_corrected, l = correct(lyso, lyso_labels)
+lys_flatfield, l = correct(lyso, lyso_labels)
 # plot the fit results:
 fig, axes = plt.subplots(1, 3, figsize=(9, 3))
 im = axes[0].imshow(l.flatfield)
@@ -138,7 +147,7 @@ axes[2].set_ylabel("Baseline")
 fig.tight_layout()
 fig.savefig('lysosome_flatfield_p' + p + '.png')
 
-dap_corrected, d = correct(dapi, dapi_labels)
+dap_flatfield, d = correct(dapi, dapi_labels)
 # plot the fit results:
 fig, axes = plt.subplots(1, 3, figsize=(9, 3))
 im = axes[0].imshow(d.flatfield)
@@ -153,11 +162,51 @@ axes[2].set_ylabel("Baseline")
 fig.tight_layout()
 fig.savefig('nuclei_flatfield_p' + p + '.png')
 
+
+
+
+
+
+### background subtraction ###
+
+def bg_subtract(img, rad=100):
+    result = cle.top_hat_sphere(img, radius_x=rad, radius_y=rad)
+    result = numpy.asarray(result)#.astype(numpy.uint16)
+    return result
+
+
+tub_corrected = []
+mit_corrected = []
+lys_corrected = []
+dap_corrected = []
+
+for i in tub_flatfield:
+    tub_corrected.append(bg_subtract(numpy.array(i)))
+
+for i in mit_flatfield:
+    mit_corrected.append(bg_subtract(numpy.array(i)))
+
+for i in lys_flatfield:
+    lys_corrected.append(bg_subtract(numpy.array(i)))
+
+for i in dap_flatfield:
+    dap_corrected.append(bg_subtract(numpy.array(i)))
+
+
+
+
 for channel, label in [(tub_corrected, tubu_labels), (mit_corrected, mito_labels), (lys_corrected, lyso_labels), (dap_corrected, dapi_labels)]:
     for i in range(len(channel)):
         name = label[i]
         img = (channel[i]/255).astype(numpy.uint8)
+        # img = channel[i]
         skimage.io.imsave('imgs_corrected/plate' + p + '/' + name, img)
+
+
+tub_corrected = numpy.array(tub_corrected)
+mit_corrected = numpy.array(mit_corrected)
+lys_corrected = numpy.array(lys_corrected)
+dap_corrected = numpy.array(dap_corrected)
 
 
 ### rescaling ###
@@ -213,6 +262,7 @@ for img in range(len(images)):
     numpy.save('processed/plate' + p + '/images/' + treatments[treatments.well == name[:3]].guide.item() + '/' + name, stack)
 
 print('preprocess done')
+print('time: ' + str((time.time()-time0)/60) + ' minutes')
 
 
 os.system('mkdir masks')

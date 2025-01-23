@@ -22,19 +22,27 @@ warnings.filterwarnings('ignore')
 import pandas
 
 
-path = 'raw_imgs/plate'
+path = 'rescaled_imgs/plate'
 p = str(sys.argv[1])
 
-# masks folders created in preprocess:
-os.system('mkdir masks/plate' + p)
-os.system('mkdir masks_tif/plate' + p)
+
+if os.path.isdir('masks'):
+    os.system('mkdir masks/plate' + p)
+    os.system('mkdir masks_tif/plate' + p)
+    os.system('mkdir bfp_masks/plate' + p)
+else:
+    os.system('mkdir masks')
+    os.system('mkdir masks_tif')
+    os.system('mkdir masks/plate' + p)
+    os.system('mkdir masks_tif/plate' + p)
+    os.system('mkdir bfp_masks')
+    os.system('mkdir bfp_masks/plate' + p)
 
 treatments = pandas.read_csv(sys.argv[2], sep='\t')
 
-# os.system('mkdir processed/plate' + p)
-os.system('mkdir processed/plate' + p + '/cells')
-for g in treatments.guide.unique():
-    os.system('mkdir processed/plate' + p + '/cells/' + g)
+# os.system('mkdir processed/plate' + p + '/cells')
+# for g in treatments.guide.unique():
+    # os.system('mkdir processed/plate' + p + '/cells/' + g)
 
 dic1 = dict()
 dic2 = dict()
@@ -54,7 +62,7 @@ def make_dic(dic, path):
 
 
 dicdict = {'1':dic1, '2':dic2, '3':dic3, '4':dic4}
-print(dicdict)
+# print(dicdict)
 
 # print(dicdict[p])
 
@@ -86,83 +94,41 @@ def make_mask(dc, channel, well, diam):
 	# mito = cv2.imread(dc[well][1], cv2.IMREAD_GRAYSCALE)
 	img = cv2.imread(dc[well][w[channel]], cv2.IMREAD_GRAYSCALE)
 	stack = cv2.merge((img, dapi))
-	
+
 
 	mask, flows, styles, diams = model.eval(stack, diameter=diam, channels=[0,0])
-	# mask, flows, styles, diams = model.eval(img, diameter=diam, channels=[1,3])
-	# mask, flows, styles = model.eval(mito, diameter=125, channels=[1,3])
-	# skimage.io.imsave(path + '/mask.png', mask)
-	# matplotlib.image.imsave('masks/mask_' + well + '.png', mask)
-	numpy.save('masks/plate' + pl + 'mask_' + well, mask)
-	skimage.io.imsave('masks_tif/plate' + pl + 'mask_' + well + '.tif', mask)
-	#print(well)
+	bfpmask, bfpflows, bfpstyles, bfpdiams = model.eval(dapi, diameter=None, channels=[1,3])
 
+	numpy.save('masks/plate' + pl + 'mask_' + well, mask)
+	numpy.save('bfp_masks/plate' + pl + 'mask_' + well, bfpmask)
+# saving masks_tif (for cellprofiler) with only BFP+ cells:
+# keeping .npy masks as everything - can use BFP- cells as controls in future
+	bfpmask[bfpmask > 0] = 1
+	intersection = mask * bfpmask
+
+	filt = numpy.unique(intersection[intersection > 0])
+	for i in numpy.unique(mask):
+		if i not in filt:
+			mask[mask==i] = 0
+
+	skimage.io.imsave('masks_tif/plate' + pl + 'mask_' + well + '.tif', mask)
+
+
+
+time0 = time.time()
 
 for x in dicdict[p].keys():
 	make_mask(dicdict[p], 'mito', x, None)
 
 
-
+print('make_mask time: ' + str((time.time()-time0)/60) + ' minutes')
 
 
 # process_mask:
 import process_mask
 
+time0 = time.time()
+process_mask
 
-# def process_mask(dic, well):
-    # if dic == dic1:
-        # pl = '1/'
-    # elif dic == dic2:
-        # pl = '2/'
-    # elif dic == dic3:
-        # pl = '3/'
-    # elif dic == dic4:
-        # pl = '4/'
-    
-    # tubu = cv2.imread(dic[well][0], cv2.IMREAD_GRAYSCALE)
-    # mito = cv2.imread(dic[well][1], cv2.IMREAD_GRAYSCALE)
-    # lyso = cv2.imread(dic[well][2], cv2.IMREAD_GRAYSCALE)
-    # dapi = cv2.imread(dic[well][w['dapi']], cv2.IMREAD_GRAYSCALE)
+print('process_mask time: ' + str((time.time()-time0)/60) + ' minutes')
 
-    # # stack = cv2.merge((tubu, mito, lyso, dapi))
-    # # numpy.save('processed/plate' + pl + 'images/' + well, stack)
-    
-    
-    # mask = numpy.load('masks/plate' + pl + 'mask_' + well + '.npy')
-    # r = 75
-    # d = mask.shape[0]
-    
-    # mask[mask==numpy.min(mask)] = 0
-    
-    # if numpy.max(mask) > 0:
-        
-        # for x in list(set(mask[mask != 0])):
-            # m = numpy.where(mask != x, 0, mask)
-            # if numpy.max(m)>0:
-                # m[m > 1] = 1
-                # im = mito * m
-                # it = tubu * m
-                # il = lyso * m
-                # ida = dapi * m
-                # centroid = ndimage.center_of_mass(m)
-                # if (r < centroid[0] < d-r) & (r < centroid[1] < d-r):
-                    
-                    # tcell = it[round(centroid[0])-r:round(centroid[0])+r, round(centroid[1])-r:round(centroid[1])+r]#.astype(numpy.uint8)
-            
-                    # mcell = im[round(centroid[0])-r:round(centroid[0])+r, round(centroid[1])-r:round(centroid[1])+r]#.astype(numpy.uint8)
-                
-                    # lcell = il[round(centroid[0])-r:round(centroid[0])+r, round(centroid[1])-r:round(centroid[1])+r]#.astype(numpy.uint8)
-
-                    # dcell = ida[round(centroid[0])-r:round(centroid[0])+r, round(centroid[1])-r:round(centroid[1])+r]#.astype(numpy.uint8)
-
-                    # if numpy.max(mcell) > 0:
-                        # stcell = cv2.merge((tcell, mcell, lcell, dcell))
-                        # numpy.save('processed/plate' + pl + 'cells/' + treatments[treatments['well'] == well[:3]].guide.item() + '/' + well + '_' + str(x), stcell)
-
-
-t0 = time.time()
-#for x in dicdict[p].keys():
-#    process_mask(dicdict[p], x)
-
-print('process_mask time:')
-print(time.time()-t0)

@@ -16,8 +16,12 @@ warnings.filterwarnings('ignore')
 # treatments = pandas.read_csv('treatments.txt', sep='\t')
 
 p = str(sys.argv[3])
-os.system('mkdir unused')
-os.system('mkdir unused/plate' + p)
+
+if os.path.isdir('unused'):
+    os.system('mkdir unused/plate' + p)
+else:
+    os.system('mkdir unused')
+    os.system('mkdir unused/plate' + p)
 
 # function to display images:
 def view_img(dc, well):#, channel):

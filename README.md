@@ -1,5 +1,5 @@
 # image-processing-measurement-analysis-ml
-preprocess and segment 384-well plates of 4-channel imaged iNeurons
+end-to-end computational pipeline to process, segment, measure, and analyze single cell profiles from 384-well plates of 4-channel imaged iNeurons
 ____________________________________________________________________________________________________________________
 
 ### image processing
@@ -47,8 +47,8 @@ ________________________________________________________________________________
 
    * used by make_mask.py but can also be run separately:
 
-     example call:
-     python process_mask.py 4 treatments.txt
+      example call:
+      python process_mask.py 4 treatments.txt
 
 --> cellpose.ipynb - [OPTIONAL] notebook for visualizing and checking segmentation and tuning parameters for specific experiment
 

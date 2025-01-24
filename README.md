@@ -7,7 +7,7 @@ ________________________________________________________________________________
 
 ### image processing
 
---> all .py scripts run on sp3.yml requirements
+--> all python scripts run on sp3.yml requirements
 
 --> preprocess.py - includes image QC, flatfield correction, background subtraction, and clipping & rescaling of raw tiffs
    
@@ -18,7 +18,7 @@ ________________________________________________________________________________
 
    * preprocess will use qc.py
 
---> output folders/files:
+   * output folders/files:
 
     ALL FOLDERS HAVE SUBFOLDERS STRATIFIED BY PLATE
     
@@ -31,4 +31,24 @@ ________________________________________________________________________________
     unused - image stacks (all 5 channels) that didn't pass QC  **includes .png images of removed images for viewing and text file with list of FOVs (i.e. well_site)
     imgs_corrected - flatfield corrected and background subtracted tiffs
     rescaled_imgs - final processed images, i.e., rescaled based on min-max percentiles (0.1, 99.9 respectively) based on plate-wise (and channel-wise) intensity histograms, saved as tiffs; these are input for cellprofiler
-    processed - images subfolder - FOV stacks saved as .npy; these are image input for machine learning, CNN, transformers, image analysis, etc.
+    processed - (images subfolder) FOV stacks saved as .npy; these are image input for machine learning, CNN, transformers, image analysis, etc.
+
+### cell segmentation
+
+--> make_mask.py - uses Cellpose 3.0 with cyto3 model + mitochondria channel to create and save segmented masks
+
+      example call:
+      python make_mask.py 4 treatments.txt
+
+   * output folders/files:
+
+     masks - cellular masks for each FOV saved as .npy
+     masks_tif - masks filtered for only BFP+ cells, saved as .tif; these are also an input for cellprofiler
+     bfp_masks - nuclear masks, used for calculating cell counts per well and checking lenti incorporation
+
+--> process_mask.py - uses output masks from make_mask to isolate single cell image stacks and saves .npy in processed/cells/ folder
+
+   * used by make_mask.py but can also be run separately:
+
+     python process_mask.py 4 treatments.txt
+

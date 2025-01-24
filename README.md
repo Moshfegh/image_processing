@@ -50,5 +50,7 @@ ________________________________________________________________________________
 
    * used by make_mask.py but can also be run separately:
 
-     python process_mask.py 4 treatments.txt
+      example call:
+      python process_mask.py 4 treatments.txt
+
 

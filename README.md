@@ -1,6 +1,5 @@
 # image-processing-measurement-analysis-ml
 preprocess and segment 384-well plates of 4-channel imaged iNeurons
-
 ____________________________________________________________________________________________________________________
 
 ### image processing

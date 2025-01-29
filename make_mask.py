@@ -55,6 +55,7 @@ def make_dic(dic, path):
 		if x.split('_')[2] + '_' + x.split('_')[3] in dic.keys():
 			dic[x.split('_')[2] + '_' + x.split('_')[3]].append(x)
 		else: dic[x.split('_')[2] + '_' + x.split('_')[3]] = [x]
+	print('# of images:')
 	print(len(dic))
 	
 	for x, y in dic.items():
@@ -62,18 +63,14 @@ def make_dic(dic, path):
 
 
 dicdict = {'1':dic1, '2':dic2, '3':dic3, '4':dic4}
-# print(dicdict)
-
-# print(dicdict[p])
 
 make_dic(dicdict[p], path + p + '/')
 
 w = {'tubulin': 0, 'mito': 1, 'lysosome': 2, 'dapi': 3, 'brightfield': 4}
-print(w)
 
 
 # generating & saving masks:
-# mito + cyto3 model from cellpose3 for ineurons - 20X
+# mito + cyto3 model from cellpose3 for iNeurons - 20X
 # NONE diameter
 ### with gpu:
 model = models.Cellpose(gpu=True, model_type='cyto3')
@@ -127,8 +124,8 @@ print('make_mask time: ' + str((time.time()-time0)/60) + ' minutes')
 # process_mask:
 import process_mask
 
-time0 = time.time()
+time1 = time.time()
 process_mask
 
-print('process_mask time: ' + str((time.time()-time0)/60) + ' minutes')
+print('process_mask time: ' + str((time.time()-time1)/60) + ' minutes')
 

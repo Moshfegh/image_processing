@@ -36,9 +36,9 @@ dic4 = dict()
 def make_dic(dic, path):
 
     for x in glob.glob(path + '*.tif'):
-        if x.split('_')[2] + '_' + x.split('_')[3] in dic.keys():
-            dic[x.split('_')[2] + '_' + x.split('_')[3]].append(x)
-        else: dic[x.split('_')[2] + '_' + x.split('_')[3]] = [x]
+        if x.split('_')[-3] + '_' + x.split('_')[-2] in dic.keys():
+            dic[x.split('_')[-3] + '_' + x.split('_')[-2]].append(x)
+        else: dic[x.split('_')[-3] + '_' + x.split('_')[-2]] = [x]
     print(len(dic))
     
     for x, y in dic.items():
@@ -52,9 +52,6 @@ def make_dic(dic, path):
 
 
 dicdict = {'1':dic1, '2':dic2, '3':dic3, '4':dic4}
-print(dicdict)
-
-print(dicdict[p])
 
 make_dic(dicdict[p], path + p + '/')
 
@@ -114,21 +111,4 @@ t0 = time.time()
 for x in dicdict[p].keys():
     process_mask(dicdict[p], x)
 
-print('process_mask time:')
-print(time.time()-t0)
-
-# for x in dic1.keys():
-    # process_mask(dic1, x)
-
-# for x in dic2.keys():
-    # process_mask(dic2, x)
-
-# for x in dic3.keys():
-    # process_mask(dic3, x)
-
-# for x in dic4.keys():
-    # process_mask(dic4, x)
-
-
-
-
+print('process_mask time: ' + str((time.time()-t0)/60) + ' minutes')

@@ -51,10 +51,10 @@ dic4 = dict()
 
 def make_dic(dic, path):
 
-	for x in glob.glob(path + '*.tif'):
-		if x.split('_')[2] + '_' + x.split('_')[3] in dic.keys():
-			dic[x.split('_')[2] + '_' + x.split('_')[3]].append(x)
-		else: dic[x.split('_')[2] + '_' + x.split('_')[3]] = [x]
+    for x in glob.glob(path + '*.tif'):
+        if x.split('_')[-3] + '_' + x.split('_')[-2] in dic.keys():
+            dic[x.split('_')[-3] + '_' + x.split('_')[-2]].append(x)
+        else: dic[x.split('_')[-3] + '_' + x.split('_')[-2]] = [x]
 	print('# of images:')
 	print(len(dic))
 	
@@ -117,15 +117,12 @@ time0 = time.time()
 for x in dicdict[p].keys():
 	make_mask(dicdict[p], 'mito', x, None)
 
-
 print('make_mask time: ' + str((time.time()-time0)/60) + ' minutes')
 
 
 # process_mask:
 import process_mask
 
-time1 = time.time()
 process_mask
 
-print('process_mask time: ' + str((time.time()-time1)/60) + ' minutes')
 

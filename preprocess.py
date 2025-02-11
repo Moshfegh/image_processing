@@ -115,7 +115,7 @@ axes[2].plot(b.baseline)
 axes[2].set_xlabel("Frame")
 axes[2].set_ylabel("Baseline")
 fig.tight_layout()
-fig.savefig('tubulin_flatfield_p' + p + '.png')
+fig.savefig('imgs_corrected/plate' + p + '/tubulin_flatfield_p' + p + '.png')
 
 mit_flatfield, m = correct(mito, mito_labels)
 # plot the fit results:
@@ -130,7 +130,7 @@ axes[2].plot(m.baseline)
 axes[2].set_xlabel("Frame")
 axes[2].set_ylabel("Baseline")
 fig.tight_layout()
-fig.savefig('mito_flatfield_p' + p + '.png')
+fig.savefig('imgs_corrected/plate' + p + '/mito_flatfield_p' + p + '.png')
 
 lys_flatfield, l = correct(lyso, lyso_labels)
 # plot the fit results:
@@ -145,7 +145,7 @@ axes[2].plot(l.baseline)
 axes[2].set_xlabel("Frame")
 axes[2].set_ylabel("Baseline")
 fig.tight_layout()
-fig.savefig('lysosome_flatfield_p' + p + '.png')
+fig.savefig('imgs_corrected/plate' + p + '/lysosome_flatfield_p' + p + '.png')
 
 dap_flatfield, d = correct(dapi, dapi_labels)
 # plot the fit results:
@@ -160,7 +160,7 @@ axes[2].plot(d.baseline)
 axes[2].set_xlabel("Frame")
 axes[2].set_ylabel("Baseline")
 fig.tight_layout()
-fig.savefig('nuclei_flatfield_p' + p + '.png')
+fig.savefig('imgs_corrected/plate' + p + '/nuclei_flatfield_p' + p + '.png')
 
 
 

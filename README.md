@@ -32,10 +32,10 @@ ________________________________________________________________________________
 
 ### cell segmentation
 
---> make_mask.py - uses Cellpose 3.0 with cyto3 model + mitochondria channel to create and save segmented masks
+--> make_mask.py - uses fine-tuned model from @pgrosjean + calcein images to segment cell bodies, requires path to raw calcein/bfp images
 
       example call:
-      python make_mask.py 4 treatments.txt
+      python make_mask.py 4 treatments.txt /mnt/IXM/1014E/20241217-sp3-20xcalcien-cpscreen-P4/2024-12-18/642/TimePoint_1/
 
    * output folders/files:
 
@@ -49,6 +49,13 @@ ________________________________________________________________________________
 
       example call:
       python process_mask.py 4 treatments.txt
+
+--> post_qc.py - additional cell filtering step after segmentation
+
+   * removes any low intensity cell stacks and clumps of cells, i.e. cell crops with more than one nucleus. moves everything to unused/ folder and saves filtering metrics as well as histograms of # of nuclei per cell crop
+
+      example call:
+      python post_qc.py 4 treatments.txt /home/ymoshfegh/1014e/20241217/
 
 --> cellpose.ipynb - [OPTIONAL] notebook for visualizing and checking segmentation and tuning parameters for specific experiment
 

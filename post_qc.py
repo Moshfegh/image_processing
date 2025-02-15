@@ -1,6 +1,6 @@
 # 2nd QC filtering after cell segmentation
 # 2 strategies - filters out low intensity cells (in all channels) & removes clusters of cells
-# python post_qc.py plate_no treatments_file
+# python post_qc.py plate_no treatments_file path_to_imgs
 
 
 import warnings
@@ -23,7 +23,7 @@ time0 = time.time()
 treatments = pandas.read_csv(sys.argv[2], sep='\t')
 # w = {'tubulin': 0, 'mito': 1, 'lysosome': 2, 'dapi': 3, 'brightfield': 4}
 
-# path = sys.argv[1]
+path = sys.argv[3]
 p = str(sys.argv[1])
 
 

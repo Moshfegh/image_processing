@@ -70,11 +70,11 @@ w = {'tubulin': 0, 'mito': 1, 'lysosome': 2, 'dapi': 3, 'brightfield': 4}
 
 
 # generating & saving masks:
-# mito + cyto3 model from cellpose3 for iNeurons - 20X
+# calcein + fine-tuned model from @pgrosjean for ineurons - 20X
 # NONE diameter
 ### with gpu:
-model = models.Cellpose(gpu=True, model_type='cyto3')
-# model = models.CellposeModel(gpu=True,  model_type='/home/ymoshfegh/1014e/20230926/20240125/CP_GCaMP')
+bfpmodel = models.Cellpose(gpu=True, model_type='cyto3')
+model = models.CellposeModel(gpu=True, model_type='/home/ymoshfegh/1014e/20230926/CP_GCaMP')
 
 
 def make_mask(dc, channel, well, diam):
@@ -87,29 +87,39 @@ def make_mask(dc, channel, well, diam):
 	elif dc == dic4:
 		pl = '4/'
 		
-	dapi = cv2.imread(dc[well][3], cv2.IMREAD_GRAYSCALE)
-	# mito = cv2.imread(dc[well][1], cv2.IMREAD_GRAYSCALE)
+	bfp = cv2.imread(dc[well][w['bfp']], cv2.IMREAD_GRAYSCALE)
+	dapi = numpy.load('processed/plate' + p + '/images/' + treatments[treatments['well']==well[:3]]['guide'].item() + '/' + well + '.npy')[:,:,3].astype(numpy.float32)
 	img = cv2.imread(dc[well][w[channel]], cv2.IMREAD_GRAYSCALE)
-	stack = cv2.merge((img, dapi))
+	# stack = cv2.merge((img, dapi))
 
+# for calcein images w/ fine-tuned model:
+	# mask, flows, styles, diams = model.eval(stack, diameter=diam, channels=[0,0])
+	mask, flows, styles = model.eval(img, diameter=diam, channels=[1,3])
+	bfpmask, bfpflows, bfpstyles, bfpdiams = bfpmodel.eval(bfp, diameter=None, channels=[1,3])
+	
+	
+# aligning calcein masks to processed images:
+	size = dapi.shape
+	warp_mode = cv2.MOTION_TRANSLATION
+	warp_matrix = numpy.eye(2,3, dtype=numpy.float32)
+	criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 5000, 1e-10)
+	(cc, warp_matrix) = cv2.findTransformECC (dapi, bfp.astype(numpy.float32), warp_matrix, warp_mode, criteria)
+	mask_aligned = cv2.warpAffine(mask, warp_matrix, (size[1],size[0]), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP)
+	bfpmask_aligned = cv2.warpAffine(bfpmask, warp_matrix, (size[1],size[0]), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP)
 
-	mask, flows, styles, diams = model.eval(stack, diameter=diam, channels=[0,0])
-	bfpmask, bfpflows, bfpstyles, bfpdiams = model.eval(dapi, diameter=None, channels=[1,3])
-
-	numpy.save('masks/plate' + pl + 'mask_' + well, mask)
-	numpy.save('bfp_masks/plate' + pl + 'mask_' + well, bfpmask)
+	numpy.save('masks/plate' + pl + 'mask_' + well, mask_aligned)
+	numpy.save('bfp_masks/plate' + pl + 'mask_' + well, bfpmask_aligned)
 # saving masks_tif (for cellprofiler) with only BFP+ cells:
 # keeping .npy masks as everything - can use BFP- cells as controls in future
-	bfpmask[bfpmask > 0] = 1
-	intersection = mask * bfpmask
+	bfpmask_aligned[bfpmask_aligned > 0] = 1
+	intersection = mask_aligned * bfpmask_aligned
 
 	filt = numpy.unique(intersection[intersection > 0])
-	for i in numpy.unique(mask):
+	for i in numpy.unique(mask_aligned):
 		if i not in filt:
-			mask[mask==i] = 0
+			mask_aligned[mask_aligned==i] = 0
 
-	skimage.io.imsave('masks_tif/plate' + pl + 'mask_' + well + '.tif', mask)
-
+	skimage.io.imsave('masks_tif/plate' + pl + 'mask_' + well + '.tif', mask_aligned)
 
 
 time0 = time.time()

@@ -75,7 +75,7 @@ w = {'tubulin': 0, 'mito': 1, 'lysosome': 2, 'dapi': 3, 'brightfield': 4}
 ### with gpu:
 bfpmodel = models.Cellpose(gpu=True, model_type='cyto3')
 model = models.CellposeModel(gpu=True, model_type='/home/ymoshfegh/1014e/20230926/CP_GCaMP')
-
+w_mtx = [numpy.array([[1,0,2.13594],[0,1,-34.15589]], dtype=numpy.float32)]
 
 def make_mask(dc, channel, well, diam):
 	if dc == dic1:
@@ -103,7 +103,11 @@ def make_mask(dc, channel, well, diam):
 	warp_mode = cv2.MOTION_TRANSLATION
 	warp_matrix = numpy.eye(2,3, dtype=numpy.float32)
 	criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 5000, 1e-10)
-	(cc, warp_matrix) = cv2.findTransformECC (dapi, bfp.astype(numpy.float32), warp_matrix, warp_mode, criteria)
+	try:
+		(cc, warp_matrix) = cv2.findTransformECC (dapi, bfp.astype(numpy.float32), warp_matrix, warp_mode, criteria)
+		w_mtx[0] = warp_matrix
+	except:
+		warp_matrix = w_mtx[0]#numpy.array([[1,0,2.13594],[0,1,-34.15589]], dtype=numpy.float32)
 	mask_aligned = cv2.warpAffine(mask, warp_matrix, (size[1],size[0]), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP)
 	bfpmask_aligned = cv2.warpAffine(bfpmask, warp_matrix, (size[1],size[0]), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP)
 

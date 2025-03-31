@@ -64,8 +64,12 @@ def make_dic(dic, path):
 	for i in list(remove[0]):
 		if i in dic.keys():
 			del dic[i]
-	print(len(dic))
-	print(list(dic.keys())[:5])
+	rmv = []
+	for x in dic.keys():
+		if x[:3] not in list(treatments.well):
+			rmv.append(x)
+	for i in rmv:
+		del dic[i]
 
 
 dicdict = {'1':dic1, '2':dic2, '3':dic3, '4':dic4}

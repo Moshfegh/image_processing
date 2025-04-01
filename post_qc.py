@@ -37,28 +37,37 @@ for m in glob.glob('masks_tif/plate' + p + '/*.tif'):
     well = name.split('_')[1]
     g = treatments[treatments['well']==well]['guide'].item()
     mask = plt.imread(m)
-    images = [numpy.load(x) for x in sorted(glob.glob(path + 'processed/plate' + p + '/cells/' + g + '/' + name[5:] + '*.npy'))]
-    labels = [x.split('/')[-1].split('.')[0] for x in sorted(glob.glob(path + 'processed/plate' + p + '/cells/' + g + '/' + name[5:] + '*.npy'))]
+    images = [numpy.load(x) for x in sorted(glob.glob('processed/plate' + p + '/cells/' + g + '/' + name[5:] + '*.npy'))]
+    labels = [x.split('/')[-1].split('.')[0] for x in sorted(glob.glob('processed/plate' + p + '/cells/' + g + '/' + name[5:] + '*.npy'))]
     idxs = [int(x.split('_')[-1]) for x in labels]
 
     tub = []
     mit = []
     lys = []
     dap = []
+    cellmasks = []
 
     for cell in images:
         tub.append(numpy.max(cell[:,:,0]))
         mit.append(numpy.max(cell[:,:,1]))
         lys.append(numpy.max(cell[:,:,2]))
         dap.append(numpy.max(cell[:,:,3]))
+        cellmask = cell[:,:,1].copy()
+        cellmask[cellmask>1] = 1
+        cellmask = clear_border(cellmask)
+        cellmasks.append(cellmask)
 
     remove = []
-    for idx in numpy.arange(len(cells)): 
+    for idx in numpy.arange(len(images)): 
         rmv_dic[g][0] += 1
-        if (tub[idx] < 26) | (mit[idx] < 26) | (lys[idx] < 26) | (dap[idx] < 26):
+# filter out cells with low intensity:
+        if ((tub[idx] < 26) & (mit[idx] < 26) & (lys[idx] < 26) & (dap[idx] < 26)):
             remove.append(idxs[idx])
             rmv_dic[g][1].append(idxs[idx])
-
+# filter out cells that weren't aligned well and got cropped in process_mask.py:
+        elif numpy.max(cellmasks[idx]) == 0:
+            remove.append(idxs[idx])
+            rmv_dic[g][1].append(idxs[idx])
 
 
     for i in numpy.unique(mask):
@@ -75,9 +84,10 @@ with open('unused/plate' + p + '/remove_intensity.json', 'w') as file:
     json.dump(rmv_dic, file)
 
 with open('unused/plate' + p + '/intensity_stats.txt', 'w') as f:
-    f.write('\t'.join(['guide', 'total_cells', 'filtered_cells', 'pct_low_intensity']) + '\n')
+    f.write('\t'.join(['guide', 'total_cells', 'filtered_cells', 'pct_removed']) + '\n')
     for g in rmv_dic.keys():
         f.write('\t'.join([g, str(rmv_dic[g][0]), str(len(rmv_dic[g][1])), str(round(len(rmv_dic[g][1])/rmv_dic[g][0], 4))]) + '\n')
+
 
 
 

@@ -1,4 +1,4 @@
-# python make_mask.py plate_no treatments_file
+# python make_mask.py plate_no treatments_file path_to_calcein_imgs
 # ml environment
 
 
@@ -12,7 +12,6 @@ from cellpose import plot
 import numpy
 import matplotlib.pyplot as plt
 import skimage.io
-import shutil
 import cv2
 import glob
 from scipy import ndimage
@@ -22,27 +21,28 @@ warnings.filterwarnings('ignore')
 import pandas
 
 
-path = 'rescaled_imgs/plate'
+# path = 'rescaled_imgs/plate'
+path = sys.argv[3]
 p = str(sys.argv[1])
 
 
 if os.path.isdir('masks'):
-    os.system('mkdir masks/plate' + p)
-    os.system('mkdir masks_tif/plate' + p)
-    os.system('mkdir bfp_masks/plate' + p)
+	os.system('mkdir masks/plate' + p)
+	os.system('mkdir masks_tif/plate' + p)
+	os.system('mkdir bfp_masks/plate' + p)
 else:
-    os.system('mkdir masks')
-    os.system('mkdir masks_tif')
-    os.system('mkdir masks/plate' + p)
-    os.system('mkdir masks_tif/plate' + p)
-    os.system('mkdir bfp_masks')
-    os.system('mkdir bfp_masks/plate' + p)
+	os.system('mkdir masks')
+	os.system('mkdir masks_tif')
+	os.system('mkdir masks/plate' + p)
+	os.system('mkdir masks_tif/plate' + p)
+	os.system('mkdir bfp_masks')
+	os.system('mkdir bfp_masks/plate' + p)
 
 treatments = pandas.read_csv(sys.argv[2], sep='\t')
 
 # os.system('mkdir processed/plate' + p + '/cells')
 # for g in treatments.guide.unique():
-    # os.system('mkdir processed/plate' + p + '/cells/' + g)
+	# os.system('mkdir processed/plate' + p + '/cells/' + g)
 
 dic1 = dict()
 dic2 = dict()
@@ -51,30 +51,47 @@ dic4 = dict()
 
 def make_dic(dic, path):
 
-    for x in glob.glob(path + '*.tif'):
-        if x.split('_')[-3] + '_' + x.split('_')[-2] in dic.keys():
-            dic[x.split('_')[-3] + '_' + x.split('_')[-2]].append(x)
-        else: dic[x.split('_')[-3] + '_' + x.split('_')[-2]] = [x]
-	print('# of images:')
-	print(len(dic))
+	for x in [x for x in glob.glob(path + '*.tif') if 'thumb' not in x]:
+		if x.split('_')[-3] + '_' + x.split('_')[-2] in dic.keys():
+			dic[x.split('_')[-3] + '_' + x.split('_')[-2]].append(x)
+		else: dic[x.split('_')[-3] + '_' + x.split('_')[-2]] = [x]
+	# print(len(dic))
 	
 	for x, y in dic.items():
 		dic[x] = sorted(y)
 
+	remove = pandas.read_csv('unused/plate' +  p + '/remove.txt', header=None)
+	for i in list(remove[0]):
+		if i in dic.keys():
+			del dic[i]
+	rmv = []
+	for x in dic.keys():
+		if x[:3] not in list(treatments.well):
+			rmv.append(x)
+	for i in rmv:
+		del dic[i]
+	# print(len(dic))
+	# print(list(dic.keys())[:5])
+
 
 dicdict = {'1':dic1, '2':dic2, '3':dic3, '4':dic4}
+# print(dicdict)
 
-make_dic(dicdict[p], path + p + '/')
+# print(dicdict[p])
 
-w = {'tubulin': 0, 'mito': 1, 'lysosome': 2, 'dapi': 3, 'brightfield': 4}
+make_dic(dicdict[p], path)# + p + '/')
+
+# w = {'tubulin': 0, 'mito': 1, 'lysosome': 2, 'dapi': 3, 'brightfield': 4}
+w = {'calcein': 0, 'bfp': 1}
 
 
 # generating & saving masks:
-# calcein + fine-tuned model from @pgrosjean for ineurons - 20X
-# NONE diameter
+# calcein + Cellpose4 built-in SAM model
+# 57 diameter
 ### with gpu:
-bfpmodel = models.Cellpose(gpu=True, model_type='cyto3')
-model = models.CellposeModel(gpu=True, model_type='/home/ymoshfegh/1014e/20230926/CP_GCaMP')
+bfpmodel = models.CellposeModel(gpu=True)
+# model = models.CellposeModel(gpu=True, model_type='/home/ymoshfegh/1014e/20230926/CP_GCaMP')
+model = models.CellposeModel(gpu=True)
 w_mtx = [numpy.array([[1,0,2.13594],[0,1,-34.15589]], dtype=numpy.float32)]
 
 def make_mask(dc, channel, well, diam):
@@ -90,12 +107,12 @@ def make_mask(dc, channel, well, diam):
 	bfp = cv2.imread(dc[well][w['bfp']], cv2.IMREAD_GRAYSCALE)
 	dapi = numpy.load('processed/plate' + p + '/images/' + treatments[treatments['well']==well[:3]]['guide'].item() + '/' + well + '.npy')[:,:,3].astype(numpy.float32)
 	img = cv2.imread(dc[well][w[channel]], cv2.IMREAD_GRAYSCALE)
-	# stack = cv2.merge((img, dapi))
+	stack = cv2.merge((img, bfp))
 
-# for calcein images w/ fine-tuned model:
+# for calcein images w/ Cellpose4 model:
 	# mask, flows, styles, diams = model.eval(stack, diameter=diam, channels=[0,0])
-	mask, flows, styles = model.eval(img, diameter=diam, channels=[1,3])
-	bfpmask, bfpflows, bfpstyles, bfpdiams = bfpmodel.eval(bfp, diameter=None, channels=[1,3])
+	mask, flows, styles = model.eval(stack, diameter=diam)#, channels=[1,3])
+	bfpmask, bfpflows, bfpstyles = bfpmodel.eval(bfp, diameter=None)#, channels=[1,3])
 	
 	
 # aligning calcein masks to processed images:
@@ -110,6 +127,7 @@ def make_mask(dc, channel, well, diam):
 		warp_matrix = w_mtx[0]#numpy.array([[1,0,2.13594],[0,1,-34.15589]], dtype=numpy.float32)
 	mask_aligned = cv2.warpAffine(mask, warp_matrix, (size[1],size[0]), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP)
 	bfpmask_aligned = cv2.warpAffine(bfpmask, warp_matrix, (size[1],size[0]), flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP)
+
 
 	numpy.save('masks/plate' + pl + 'mask_' + well, mask_aligned)
 	numpy.save('bfp_masks/plate' + pl + 'mask_' + well, bfpmask_aligned)
@@ -126,17 +144,27 @@ def make_mask(dc, channel, well, diam):
 	skimage.io.imsave('masks_tif/plate' + pl + 'mask_' + well + '.tif', mask_aligned)
 
 
+
 time0 = time.time()
 
 for x in dicdict[p].keys():
-	make_mask(dicdict[p], 'mito', x, None)
+	make_mask(dicdict[p], 'calcein', x, 57)
 
-print('make_mask time: ' + str((time.time()-time0)/60) + ' minutes')
+
+print('make_mask time: ' + str(round((time.time()-time0)/60, 4)) + ' minutes')
 
 
 # process_mask:
 import process_mask
 
+# time1 = time.time()
 process_mask
 
+# print('process_mask time: ' + str(round((time.time()-time1)/60, 4)) + ' minutes')
+
+
+
+# post-segmentation QC:
+import post_qc
+post_qc
 

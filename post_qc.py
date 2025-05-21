@@ -1,6 +1,6 @@
 # 2nd QC filtering after cell segmentation
-# 2 strategies - filters out low intensity cells (in all channels) & removes clusters of cells
-# python post_qc.py plate_no treatments_file path_to_imgs
+# 3 strategies - filters out low intensity cells (in all channels), filter for unaligned cropped cells, & removes clusters of cells
+# python post_qc.py plate_no treatments_file
 
 
 import warnings
@@ -16,6 +16,7 @@ from cellpose import utils, io, models, core
 import sys
 import time
 import json
+from skimage.segmentation import clear_border
 os.environ["CUDA_VISIBLE_DEVICES"] = str(sys.argv[1])
 
 time0 = time.time()
@@ -23,7 +24,7 @@ time0 = time.time()
 treatments = pandas.read_csv(sys.argv[2], sep='\t')
 # w = {'tubulin': 0, 'mito': 1, 'lysosome': 2, 'dapi': 3, 'brightfield': 4}
 
-path = sys.argv[3]
+# path = sys.argv[3]
 p = str(sys.argv[1])
 
 
@@ -46,6 +47,7 @@ for m in glob.glob('masks_tif/plate' + p + '/*.tif'):
     lys = []
     dap = []
     cellmasks = []
+    clear_borders = []
 
     for cell in images:
         tub.append(numpy.max(cell[:,:,0]))
@@ -54,18 +56,19 @@ for m in glob.glob('masks_tif/plate' + p + '/*.tif'):
         dap.append(numpy.max(cell[:,:,3]))
         cellmask = cell[:,:,1].copy()
         cellmask[cellmask>1] = 1
-        cellmask = clear_border(cellmask)
+        cm = clear_border(cellmask)
         cellmasks.append(cellmask)
+        clear_borders.append(cm)
 
     remove = []
     for idx in numpy.arange(len(images)): 
         rmv_dic[g][0] += 1
 # filter out cells with low intensity:
-        if ((tub[idx] < 26) & (mit[idx] < 26) & (lys[idx] < 26) & (dap[idx] < 26)):
+        if (((tub[idx] < 26) & (mit[idx] < 26) & (lys[idx] < 26)) | (dap[idx] < 26)):
             remove.append(idxs[idx])
             rmv_dic[g][1].append(idxs[idx])
 # filter out cells that weren't aligned well and got cropped in process_mask.py:
-        elif numpy.max(cellmasks[idx]) == 0:
+        elif (cellmasks[idx]!=clear_borders[idx]).any():
             remove.append(idxs[idx])
             rmv_dic[g][1].append(idxs[idx])
 
@@ -91,7 +94,8 @@ with open('unused/plate' + p + '/intensity_stats.txt', 'w') as f:
 
 
 
-# cyto3 model from cellpose on nuclear channel to remove cell crops with more than one nucleus:
+
+# Cellpose-SAM model from cellpose4 on nuclear channel to remove cell crops with more than one nucleus:
 
 def make_dic(dc, plate):
     for g in treatments.guide.unique():
@@ -102,17 +106,20 @@ dic = dict()
 
 make_dic(dic, p)
 
+
+#cellpose4 built-in model:
+model = models.CellposeModel(gpu=True)#, model_type='cyto3')
+
 def get_mask(dc, name, guide, diam):
 
-    #cellpose3 built-in model:
-    model = models.Cellpose(gpu=True, model_type='cyto3')
-    
     img = dc[guide][0][dc[guide][1].index(name)]
+    
+    mask, flows, styles = model.eval(img, diameter=diam, cellprob_threshold=-2, flow_threshold=.95)
 
-    try:
-        mask, flows, styles, diams = model.eval(img, diameter=diam, channels=[1,3])
-    except:
-        return -1
+    # try:
+        # mask, flows, styles = model.eval(img, diameter=diam)#, channels=[1,3])
+    # except:
+        # return -1
     return len(numpy.unique(mask))
 
 
@@ -122,7 +129,10 @@ labels = [x.split('.')[0][-6:] for x in glob.glob('masks_tif/plate' + p + '/*.ti
 
 
 bfpmasks = dict()
-remove = []
+remove_0 = []
+remove_clump = []
+
+## using diameter=45 for nuclei
 
 for g in treatments.guide.unique():
     # print(g)
@@ -130,10 +140,15 @@ for g in treatments.guide.unique():
     bfpmasks[g] = []
     for i in dic[g][1]:
         name = i[:6]
-        m = get_mask(dic, i, g, None)
+        m = get_mask(dic, i, g, 45)
         bfpmasks[g].append(m)
-        if m != 2:
-            remove.append(i)
+        if m == 1:
+            remove_0.append(i)
+            idx = int(i.split('_')[-1])
+            masks[labels.index(name)][masks[labels.index(name)] == idx] = 0
+            
+        elif m > 2:
+            remove_clump.append(i)
             
             idx = int(i.split('_')[-1])
             masks[labels.index(name)][masks[labels.index(name)] == idx] = 0
@@ -143,12 +158,17 @@ with open('unused/plate' + p + '/nuclei.json', 'w') as file:
     json.dump(bfpmasks, file)
 
 with open('unused/plate' + p + '/remove_clumps.txt', 'w') as f:
-    f.write('\n'.join(x for x in remove))
+    f.write('\n'.join(x for x in remove_clump))
+
+with open('unused/plate' + p + '/remove_no_nuclei.txt', 'w') as f:
+    f.write('\n'.join(x for x in remove_0))
 
 with open('unused/plate' + p + '/clumping_stats.txt', 'w') as f:
     f.write('\t'.join(['guide', 'total_cells', 'filtered_cells', 'pct_clumps']) + '\n')
     for g in bfpmasks.keys():
-        f.write('\t'.join([g, str(len(bfpmasks[g])), str(bfpmasks[g].count(2)), str(round(1 - bfpmasks[g].count(2)/len(bfpmasks[g]), 4))]) + '\n')
+#        f.write('\t'.join([g, str(len(bfpmasks[g])), str(len(bfpmasks[g]) - bfpmasks[g].count(2)), str(round(1 - bfpmasks[g].count(2)/len(bfpmasks[g]), 4))]) + '\n')
+        f.write('\t'.join([g, str(len(bfpmasks[g]) - bfpmasks[g].count(1)), str(len(bfpmasks[g]) - bfpmasks[g].count(1) - bfpmasks[g].count(2)), str(round(1 - bfpmasks[g].count(2)/(len(bfpmasks[g]) - bfpmasks[g].count(1))), 4)]) + '\n')
+
 
 for x in bfpmasks.keys():
     plt.hist(bfpmasks[x], bins=10)

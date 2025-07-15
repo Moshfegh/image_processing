@@ -1,25 +1,22 @@
 # python preprocess.py path_to_images treatment_file plate_no
 # ml environment
 
-
 from matplotlib import pyplot as plt
 import pandas
 import glob
 import numpy
 from basicpy import BaSiC
-import warnings
-warnings.filterwarnings('ignore')
 import os
-
 import scipy.stats as stats
 import cv2
-import skimage.io as io
 import skimage
-
 import pyclesperanto_prototype as cle
-
 import sys
 import time
+from pathlib import Path
+import warnings
+warnings.filterwarnings('ignore')
+
 os.environ["CUDA_VISIBLE_DEVICES"] = str(sys.argv[3])
 
 time0 = time.time()
@@ -27,7 +24,7 @@ time0 = time.time()
 treatments = pandas.read_csv(sys.argv[2], sep='\t')
 w = {'tubulin': 0, 'mito': 1, 'lysosome': 2, 'dapi': 3, 'brightfield': 4}
 
-path = sys.argv[1]
+path = Path(sys.argv[1].replace('\\', ''))
 p = str(sys.argv[3])
 
 if os.path.isdir('raw_imgs'):
@@ -51,14 +48,15 @@ for g in treatments.guide.unique():
     os.system('mkdir processed/plate' + p + '/images/' + g)
 
 
-raw_imgs = [f for f in glob.glob(path + '*.tif') if not 'thumb' in f]
+r = [_file.absolute().as_posix() for _file in path.iterdir()]
+raw_imgs = [f for f in r if ('tif' in f) & ('thumb' not in f)]
 print('# images: ' + str(len(raw_imgs)))
 for f in raw_imgs:
     name = f.split('/')[-1]
+    tmp = name.split('_')[-3]
     # os.system('ln -s ' + f + ' raw_imgs/')
-    os.system('cp ' + f + ' raw_imgs/plate' + p + '/' + name)
-    tmp = plt.imread(f)
-    # io.imsave('raw_imgs/plate' + p + '/' + name, tmp)
+    if tmp in list(treatments.well):
+        os.system('cp ' + f + ' raw_imgs/plate' + p + '/' + name)
 
 
 # remove bad images:
@@ -69,26 +67,22 @@ qc
 tubu = [plt.imread(x) for x in sorted(glob.glob('raw_imgs/plate' + p + '/*.tif')) if '_w1' in x]
 tubu_labels = [x.split('/')[-1] for x in sorted(glob.glob('raw_imgs/plate' + p + '/*.tif')) if '_w1' in x]
 print(len(tubu))
-#print(len(tubu_labels))
-#print('tubulin')
+
 
 dapi = [plt.imread(x) for x in sorted(glob.glob('raw_imgs/plate' + p + '/*.tif')) if '_w4' in x]
 dapi_labels = [x.split('/')[-1] for x in sorted(glob.glob('raw_imgs/plate' + p + '/*.tif')) if '_w4' in x]
 print(len(dapi))
-#print(len(dapi_labels))
-#print('dapi')
+
 
 mito = [plt.imread(x) for x in sorted(glob.glob('raw_imgs/plate' + p + '/*.tif')) if '_w2' in x]
 mito_labels = [x.split('/')[-1] for x in sorted(glob.glob('raw_imgs/plate' + p + '/*.tif')) if '_w2' in x]
 print(len(mito))
-#print(len(mito_labels))
-#print('mito')
+
 
 lyso = [plt.imread(x) for x in sorted(glob.glob('raw_imgs/plate' + p + '/*.tif')) if '_w3' in x]
 lyso_labels = [x.split('/')[-1] for x in sorted(glob.glob('raw_imgs/plate' + p + '/*.tif')) if '_w3' in x]
 print(len(lyso))
-#print(len(lyso_labels))
-#print('lyso')
+
 
 tubu = numpy.array(tubu)
 mito = numpy.array(mito)
@@ -100,7 +94,8 @@ def correct(channel, names):
     basic = BaSiC(get_darkfield=True, smoothness_flatfield=1)
     basic.fit(channel)
     images_transformed = basic.transform(channel)
-    return(images_transformed, basic)
+    return (images_transformed, basic)
+
 
 tub_flatfield, b = correct(tubu, tubu_labels)
 # plot the fit results:
@@ -163,15 +158,11 @@ fig.tight_layout()
 fig.savefig('imgs_corrected/plate' + p + '/nuclei_flatfield_p' + p + '.png')
 
 
-
-
-
-
-### background subtraction ###
+# background subtraction
 
 def bg_subtract(img, rad=100):
     result = cle.top_hat_sphere(img, radius_x=rad, radius_y=rad)
-    result = numpy.asarray(result)#.astype(numpy.uint16)
+    result = numpy.asarray(result)
     return result
 
 
@@ -193,14 +184,12 @@ for i in dap_flatfield:
     dap_corrected.append(bg_subtract(numpy.array(i)))
 
 
-
-
-for channel, label in [(tub_corrected, tubu_labels), (mit_corrected, mito_labels), (lys_corrected, lyso_labels), (dap_corrected, dapi_labels)]:
-    for i in range(len(channel)):
-        name = label[i]
-        img = (channel[i]/255).astype(numpy.uint8)
-        # img = channel[i]
-        skimage.io.imsave('imgs_corrected/plate' + p + '/' + name, img)
+# for channel, label in [(tub_corrected, tubu_labels), (mit_corrected, mito_labels), (lys_corrected, lyso_labels), (dap_corrected, dapi_labels)]:
+    # for i in range(len(channel)):
+        # name = label[i]
+        # img = (channel[i]/255).astype(numpy.uint8)
+        # # img = channel[i]
+        # skimage.io.imsave('imgs_corrected/plate' + p + '/' + name, img)
 
 
 tub_corrected = numpy.array(tub_corrected)
@@ -208,8 +197,6 @@ mit_corrected = numpy.array(mit_corrected)
 lys_corrected = numpy.array(lys_corrected)
 dap_corrected = numpy.array(dap_corrected)
 
-
-### rescaling ###
 
 # rescaling based on 16-bit corrected images:
 
@@ -235,9 +222,9 @@ for idx in range(len(tub_corrected)):
     l2 = lyso_labels[idx]
     t3 = dap_corrected[idx]
     l3 = dapi_labels[idx]
-    
-    imgs = cv2.merge((t0,t1,t2,t3))
-    l = [l0,l1,l2,l3]
+
+    imgs = cv2.merge((t0, t1, t2, t3))
+    l = [l0, l1, l2, l3]
     images.append(imgs)
     labels.append(l)
 
@@ -245,16 +232,16 @@ for idx in range(len(tub_corrected)):
 for img in range(len(images)):
     tmp0 = (skimage.exposure.rescale_intensity(images[img][:,:,0], in_range=(pmin0, pmax0))*255).astype(numpy.uint8)
     skimage.io.imsave('rescaled_imgs/plate' + p + '/' + labels[img][0], tmp0)
-    
+
     tmp1 = (skimage.exposure.rescale_intensity(images[img][:,:,1], in_range=(pmin1, pmax1))*255).astype(numpy.uint8)
     skimage.io.imsave('rescaled_imgs/plate' + p + '/' + labels[img][1], tmp1)
-    
+
     tmp2 = (skimage.exposure.rescale_intensity(images[img][:,:,2], in_range=(pmin2, pmax2))*255).astype(numpy.uint8)
     skimage.io.imsave('rescaled_imgs/plate' + p + '/' + labels[img][2], tmp2)
-    
+
     tmp3 = (skimage.exposure.rescale_intensity(images[img][:,:,3], in_range=(pmin3, pmax3))*255).astype(numpy.uint8)
     skimage.io.imsave('rescaled_imgs/plate' + p + '/' + labels[img][3], tmp3)
-    
+
     stack = cv2.merge((tmp0, tmp1, tmp2, tmp3))
 
     name = labels[img][0].split('_')[1] + '_' + labels[img][0].split('_')[2]
@@ -262,8 +249,4 @@ for img in range(len(images)):
     numpy.save('processed/plate' + p + '/images/' + treatments[treatments.well == name[:3]].guide.item() + '/' + name, stack)
 
 print('preprocess done')
-print('time: ' + str((time.time()-time0)/60) + ' minutes')
-
-
-os.system('mkdir masks')
-os.system('mkdir masks_tif')
+print('time: ' + str(round((time.time()-time0)/60, 4)) + ' minutes')

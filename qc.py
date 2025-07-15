@@ -2,18 +2,10 @@ import sys
 import numpy
 import matplotlib.pyplot as plt
 import skimage.io as io
-import shutil
 import os
-import cv2
 import glob
-from scipy import ndimage
-import time
-import pandas
 import warnings
 warnings.filterwarnings('ignore')
-
-
-# treatments = pandas.read_csv('treatments.txt', sep='\t')
 
 p = str(sys.argv[3])
 
@@ -23,14 +15,13 @@ else:
     os.system('mkdir unused')
     os.system('mkdir unused/plate' + p)
 
-# function to display images:
-def view_img(dc, well):#, channel):
-    # img = io.imread(dataset[dc][well][w[channel]])
 
+# function to display images:
+def view_img(dc, well):
     t = io.imread(dc[well][w['tubulin']])
     m = io.imread(dc[well][w['mito']])
     l = io.imread(dc[well][w['lysosome']])
-    
+
     # fig = plt.figure(figsize=(36, 20))
     fig = plt.figure()
 
@@ -47,13 +38,15 @@ def view_img(dc, well):#, channel):
     ax[2].imshow(l, cmap='gray')
     ax[2].set_title('lysosome')
     ax[2].axis('off')
-    
+
     plt.suptitle(well, y=.75, fontsize=12)
     fig.tight_layout()
     # plt.show()
     plt.savefig('unused/plate' + p + '/' + well + '.png')
 
+
 w = {'tubulin': 0, 'mito': 1, 'lysosome': 2, 'dapi': 3, 'brightfield': 4}
+
 
 def make_dic(dic, path):
     for x in glob.glob(path + '*.tif'):# + glob.glob('unused_imgs/*.tif'):
@@ -61,9 +54,10 @@ def make_dic(dic, path):
             dic[x.split('_')[2] + '_' + x.split('_')[3]].append(x)
         else: dic[x.split('_')[2] + '_' + x.split('_')[3]] = [x]
     print(len(dic))
-    
+
     for x, y in dic.items():
         dic[x] = sorted(y)
+
 
 dic = dict()
 make_dic(dic, 'raw_imgs/plate' + p + '/')
@@ -72,6 +66,7 @@ make_dic(dic, 'raw_imgs/plate' + p + '/')
 def get_img(dc, well, channel):
     img = io.imread(dc[well][w[channel]])
     return img
+
 
 tubu = []
 mito = []
